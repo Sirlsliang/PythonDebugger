@@ -47,7 +47,7 @@ class debugger(object):
     def __init__(self):pass
     
     def load(self, path_to_exe):
-        creation_flags = DEBUG_PROCESS
+        creation_flags = CREATE_NEW_CONSOLE
         #实例化之前定义的结构体
         startupinfo     = STARTUPINFO()
         process_information = PROCESS_INFORMATION()
@@ -59,7 +59,7 @@ class debugger(object):
         #设置结构体STARTUPINFO中的成员变量cb的值，用以表示结构体本身的大小
         startupinfo.cb = sizeof(startupinfo)
         
-        if kernel32.CreateProcess(path_to_exe,
+        if kernel32.CreateProcessA(path_to_exe,
                                    None,
                                    None,
                                    None,
