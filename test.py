@@ -3,7 +3,11 @@
 import my_debugger
 
 debugger = my_debugger.debugger()
-debugger.load(b"c:\\WINDOWS\\system32\\calc.exe")
+#debugger.load(b"c:\\WINDOWS\\system32\\calc.exe")
 """
 在传入的路径值前面加上b ，成功运行
 """
+
+pid = input("Enter the PID of the process to attach to:  ")
+debugger.attach(int(pid))
+debugger.detach()

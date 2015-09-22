@@ -44,7 +44,11 @@ from my_debugger_defines import *
 kernel32 = windll.kernel32
 
 class debugger(object):
-    def __init__(self):pass
+    def __init__(self):
+        self.h_process = None
+        self.pid = None
+        self.debugger_active = False
+    
     
     def load(self, path_to_exe):
         creation_flags = CREATE_NEW_CONSOLE
@@ -72,8 +76,46 @@ class debugger(object):
         
             print("[*] We have successfully launched the process")
             print("[*] PID:%d" % process_information.dwProcessId)
+            #保存一个指向新建进程的一个有效句柄以供后续的进程访问所使用
+            self.h_process = self.open_process(process_information.dwProcessId)
         else:
             print("[*] Error: 0x%08." % kernel32.GetLastError())
+
+    def open_process(self,pid):
+        h_process = kernel32.OpenProcess(PROCESS_ALL_ACCESS,False,pid)
+
+    def attach(self,pid):
+        self.h_process = self.open_process(pid)
+        #试图附加到目标进程，如附加失败，则输出提示信息并返回
+        if kernel32.DebugActiveProcess(pid):
+            self.debugger_active = True
+            self.pid = int(pid)
+            self.run()
+        else:
+            print("[*] Unable to attach to the process.")
+
+    def run(self):
+        #现在我们等待发生在debugee进程中的调试事件
+        while self.debugger_active == True:
+            self.get_debug_event()
+
+    def get_debug_event(self):
+        debug_event = DEBUG_EVENT()
+        continue_status = DBG_CONTINUE
+
+        if kernel32.WaitForDebugEvent(byref(debug_event),INFINITE):
+            #目前我们还未构建任何与事件处理相关的功能逻辑，我们先简单的恢复目标进程
+            input("press a key to continue....")
+            self.debugger_active = True
+            kernel32.ContinueDebugEvent(debug_event.dwProcessId,debug_event.dwThreaId,continue_status)
+
+    def detach(self):
+        if kernel32.DebugActiveProcessStop(self.pid):
+            print("[*] Finished debugging. Exiting....")
+            return True
+        else:
+            print("There was an error")
+            return False
     
 
 
