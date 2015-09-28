@@ -48,6 +48,8 @@ class debugger(object):
         self.h_process = None
         self.pid = None
         self.debugger_active = False
+        self.h_thread = None
+        self.context  = None
     
     
     def load(self, path_to_exe):
@@ -83,6 +85,7 @@ class debugger(object):
 
     def open_process(self,pid):
         h_process = kernel32.OpenProcess(PROCESS_ALL_ACCESS,False,pid)
+        return h_process
 
     def attach(self,pid):
         self.h_process = self.open_process(pid)
@@ -97,6 +100,7 @@ class debugger(object):
     def run(self):
         #现在我们等待发生在debugee进程中的调试事件
         while self.debugger_active == True:
+            print("1")
             self.get_debug_event()
 
     def get_debug_event(self):
@@ -104,10 +108,11 @@ class debugger(object):
         continue_status = DBG_CONTINUE
 
         if kernel32.WaitForDebugEvent(byref(debug_event),INFINITE):
-            #目前我们还未构建任何与事件处理相关的功能逻辑，我们先简单的恢复目标进程
-            input("press a key to continue....")
+            self.h_thread = self.open_thread(debug_event.dwThreadId)
+            self.context = self.get_thread_context(self.h_thread)
+            print("Event code: %d Thread ID %d" %(debug_event.dwDebugEventCode,debug_event.dwThreadId))
             self.debugger_active = True
-            kernel32.ContinueDebugEvent(debug_event.dwProcessId,debug_event.dwThreaId,continue_status)
+            kernel32.ContinueDebugEvent(debug_event.dwProcessId,debug_event.dwThreadId,continue_status)
 
     def detach(self):
         if kernel32.DebugActiveProcessStop(self.pid):
@@ -117,7 +122,44 @@ class debugger(object):
             print("There was an error")
             return False
     
+    def open_thread(self,thread_id):
+        h_thread = kernel32.OpenThread(THREAD_ALL_ACCESS,None,thread_id)
+        if h_thread is not None:
+            return h_thread
+        else:
+            print ("[*] Counld not obtain a valid thread handle.")
+            return False
 
+
+    def enumerate_threads(self):
+        thread_entry =THREADENTRY32()
+        thread_list = []
+        snapshot = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD,self.pid)
+        if snapshot is not None:
+            #设置结构体的大小，否则会调用失败
+            thread_entry.dwSize = sizeof(thread_entry)
+            success = kernel32.Thread32First(snapshot,byref(thread_entry))
+            while success:
+                print(thread_entry.th32OwnerProcessID)
+                if thread_entry.th32OwnerProcessID == self.pid:
+                    thread_list.append(thread_entry.th32OwnerProcessID)
+                success = kernel32.Thread32Next(snapshot,byref(thread_entry))
+            kernel32.CloseHandle(snapshot)
+            return thread_list
+        else:
+            return False
+
+    def get_thread_context(self,thread_id = None,h_thread= None):
+        context = CONTEXT()
+        context.ContextFlags= CONTEXT_FULL|CONTEXT_DEBUG_REGISTERS
+        #获取线程句柄
+
+        h_thread = self.open_thread(thread_id)
+        if kernel32.GetThreadContext(h_thread,byref(context)):
+            
+            return context
+        else:
+            return False
 
 
 
